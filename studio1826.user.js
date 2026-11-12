@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         v5.9.0 Studio 1826 — Расчёт администраторов и интерфейс
+// @name         v5.9.2 Studio 1826 — Расчёт администраторов и интерфейс
 // @namespace    studio1826
-// @version      5.9.0
+// @version      5.9.2
 // @description  Расчёт администраторов, копирование оборудования, информация по помещениям, тема и скрытие элементов Bitrix24 (в настройках)
 // @updateURL    https://raw.githubusercontent.com/zinovievilia/studio-1826-installer/main/studio1826.meta.js
 // @downloadURL  https://raw.githubusercontent.com/zinovievilia/studio-1826-installer/main/studio1826.user.js
@@ -14,7 +14,7 @@
 (function () {
     'use strict';
 
-    const VERSION = '5.9.0';
+    const VERSION = '5.9.2';
 
     const WIDGET_ID = 'studio1826-widget-v3';
     const STYLE_ID = 'studio1826-style-v3';
@@ -2071,7 +2071,12 @@
         /* 5.6.5 (Илья) */
         ['Радиосистема HollyLand Lark M2',600],
         ['Софтбокс 60х90см - Profoto 2x3ft RFI',0],
-        ['Соты 90 см',0]
+        ['Соты 90 см',0],
+        ['USB Type-C to USB Type-C',500],
+        ['USB to Micro-USB',500],
+        ['HDMI to USB-C',500],
+        ['HDMI to HDMI',500],
+        ['USB Type-C to Micro-USB 3.0',500]
     ];
 
     /* =========================================================
@@ -2174,7 +2179,21 @@
 
         if (options.lightSetupEnabled === false) off.add('light');
 
-        const items = (records || []).flatMap(record => record.items || []);
+        /*
+         * 5.9.2: бронь с позицией «Оборудование на выезд» — выездная съёмка;
+         * её оборудование не входит в расчёт зарплаты администратора.
+         * Часы, услуги (свет, фон, уборка) и кофе из такой брони учитываются как обычно.
+         */
+        const OFFSITE_KEY = norm('Оборудование на выезд');
+        const isOffsiteRecord = record =>
+            (record.items || []).some(item => containsKey(norm(item), OFFSITE_KEY));
+
+        const allRecords = records || [];
+        const items = allRecords.flatMap(record => record.items || []);
+        const itemsForEq = allRecords
+            .filter(record => !isOffsiteRecord(record))
+            .flatMap(record => record.items || []);
+
         const n = Math.max(1, admins);
         const config = HOURS_BONUSES[category];
         const hallKeys = HALL_INDEX[category];
@@ -2186,12 +2205,10 @@
         const counts = {};
         SERVICES.forEach(service => { counts[service.name] = 0; });
 
+        /* Часы, услуги и кофе — по всем бронями без исключений. */
         items.forEach(item => {
             const qty = quantity(item);
             const text = norm(item);
-
-            const equipment = findEquipment(item);
-            if (equipment) eq += equipment.price * qty;
 
             const service = SERVICE_INDEX.find(s => containsKey(text, s.key));
             if (service) counts[service.name] += qty;
@@ -2201,6 +2218,13 @@
             }
 
             if (hallKeys.some(hall => containsKey(text, hall.key))) rawHours += qty;
+        });
+
+        /* Оборудование — только из броней без «Оборудование на выезд». */
+        itemsForEq.forEach(item => {
+            const qty = quantity(item);
+            const equipment = findEquipment(item);
+            if (equipment) eq += equipment.price * qty;
         });
 
         const hours = Math.ceil(rawHours);
