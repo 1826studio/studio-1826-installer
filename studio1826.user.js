@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         v5.9.2 Studio 1826 — Расчёт администраторов и интерфейс
+// @name         v5.11.0 Studio 1826 — Расчёт администраторов и интерфейс
 // @namespace    studio1826
-// @version      5.9.2
+// @version      5.11.0
 // @description  Расчёт администраторов, копирование оборудования, информация по помещениям, тема и скрытие элементов Bitrix24 (в настройках)
 // @updateURL    https://raw.githubusercontent.com/zinovievilia/studio-1826-installer/main/studio1826.meta.js
 // @downloadURL  https://raw.githubusercontent.com/zinovievilia/studio-1826-installer/main/studio1826.user.js
@@ -14,7 +14,7 @@
 (function () {
     'use strict';
 
-    const VERSION = '5.9.2';
+    const VERSION = '5.11.0';
 
     const WIDGET_ID = 'studio1826-widget-v3';
     const STYLE_ID = 'studio1826-style-v3';
@@ -84,6 +84,7 @@
     const SETTINGS_ID = 'studio1826-settings-v32';
     const ACTIONS_ID = 'studio1826-actions-v34';
     const DAY_DIALOG_ID = 'studio1826-day-dialog-v34';
+    const HISTORY_DIALOG_ID = 'studio1826-history-dialog-v1';
     const CHIP_ID = 'studio1826-chip';
     const CHIP_SLOT_ID = 'studio1826-chip-slot';
 
@@ -1244,6 +1245,7 @@
              * (единственное место переключения, без дублирования). */
             html.s26-overlay-open #${WIDGET_ID},
             html.s26-overlay-open #${DAY_DIALOG_ID},
+            html.s26-overlay-open #${HISTORY_DIALOG_ID},
             html.s26-overlay-open #${TOAST_ID} {
                 display: none !important;
             }
@@ -1415,6 +1417,243 @@
             #${DAY_DIALOG_ID} .dd-line.keep { color: #7ee2a0; }
             #${DAY_DIALOG_ID} .dd-line.move { color: #7fb4ff; }
             #${DAY_DIALOG_ID} .dd-line.missing { color: #ff8a8a; font-weight: 700; }
+        `,
+        historyDialog: `
+            #${HISTORY_DIALOG_ID} {
+                position: fixed;
+                z-index: 1000001;
+                width: min(980px, calc(100vw - 16px));
+                max-height: calc(100vh - 16px);
+                overflow: auto;
+                padding: 14px 15px 15px;
+                color: #fff;
+                background: #202020;
+                border: 1px solid #444;
+                border-radius: 10px;
+                box-shadow: 0 5px 24px #0006;
+                font: 13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+            }
+            #${HISTORY_DIALOG_ID}[hidden] { display: none !important; }
+            #${HISTORY_DIALOG_ID} * { box-sizing: border-box; }
+            #${HISTORY_DIALOG_ID} .dh-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 12px;
+                font-weight: 700;
+            }
+            #${HISTORY_DIALOG_ID} .dh-close,
+            #${HISTORY_DIALOG_ID} .dh-copy {
+                min-height: 30px;
+                padding: 5px 10px;
+                border: 1px solid #555;
+                border-radius: 6px;
+                background: transparent;
+                color: inherit;
+                font: inherit;
+                cursor: pointer;
+            }
+            #${HISTORY_DIALOG_ID} .dh-close { width: 34px; padding: 0; font-size: 18px; }
+            #${HISTORY_DIALOG_ID} .dh-head-actions { display: flex; gap: 7px; align-items: center; }
+            #${HISTORY_DIALOG_ID} .dh-form {
+                display: grid;
+                grid-template-columns: minmax(220px, 1fr) 120px 132px 132px auto;
+                gap: 8px;
+                align-items: end;
+            }
+            #${HISTORY_DIALOG_ID} .dh-label {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                color: #aaa;
+                font-size: 10px;
+                font-weight: 750;
+                letter-spacing: .06em;
+                text-transform: uppercase;
+            }
+            #${HISTORY_DIALOG_ID} select,
+            #${HISTORY_DIALOG_ID} input {
+                width: 100%;
+                min-height: 34px;
+                padding: 7px 8px;
+                border: 1px solid #555;
+                border-radius: 6px;
+                background: #141414;
+                color: #fff;
+                font: inherit;
+                font-size: 12px;
+            }
+            #${HISTORY_DIALOG_ID} .dh-run {
+                min-height: 34px;
+                padding: 7px 12px;
+                border: 1px solid #fff;
+                border-radius: 6px;
+                background: #fff;
+                color: #171717;
+                font: inherit;
+                font-weight: 700;
+                cursor: pointer;
+            }
+            #${HISTORY_DIALOG_ID} button:disabled { opacity: .5; cursor: default; }
+            #${HISTORY_DIALOG_ID} .dh-status { margin: 10px 0 8px; min-height: 18px; color: #aaa; font-size: 11px; }
+            #${HISTORY_DIALOG_ID} .dh-status.dh-warn { color: #f0b429; }
+            #${HISTORY_DIALOG_ID} .dh-result { border-top: 1px solid #444; padding-top: 10px; }
+            #${HISTORY_DIALOG_ID} .dh-gaps {
+                margin: 0 0 10px;
+                padding: 7px 9px;
+                border-left: 3px solid #f0b429;
+                border-radius: 5px;
+                background: #f0b42918;
+                color: #f0b429;
+                font-size: 12px;
+            }
+            #${HISTORY_DIALOG_ID} .dh-summary-row {
+                display: flex;
+                align-items: baseline;
+                justify-content: space-between;
+                gap: 10px;
+                margin-bottom: 8px;
+            }
+            #${HISTORY_DIALOG_ID} .dh-summary { color: #ddd; font-weight: 650; }
+            #${HISTORY_DIALOG_ID} .dh-summary-sub { margin-top: 3px; color: #aaa; font-size: 11px; font-weight: 500; }
+            #${HISTORY_DIALOG_ID} .dh-copy { font-size: 12px; white-space: nowrap; }
+            #${HISTORY_DIALOG_ID} .dh-audit {
+                display: grid;
+                gap: 9px;
+                margin-bottom: 12px;
+            }
+            #${HISTORY_DIALOG_ID} .dh-audit-head {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px 14px;
+                padding: 9px 10px;
+                border: 1px solid #444;
+                border-radius: 7px;
+                background: #181818;
+            }
+            #${HISTORY_DIALOG_ID} .dh-metric { color: #ddd; }
+            #${HISTORY_DIALOG_ID} .dh-metric strong { color: #fff; }
+            #${HISTORY_DIALOG_ID} .dh-metric.dh-danger strong { color: #ff8a8a; }
+            #${HISTORY_DIALOG_ID} .dh-metric.dh-ok strong { color: #7ee2a0; }
+            #${HISTORY_DIALOG_ID} .dh-audit-grid {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                gap: 9px;
+            }
+            #${HISTORY_DIALOG_ID} .dh-audit-card {
+                min-width: 0;
+                padding: 9px 10px;
+                border: 1px solid #444;
+                border-radius: 7px;
+                background: #181818;
+            }
+            #${HISTORY_DIALOG_ID} .dh-audit-title {
+                margin-bottom: 6px;
+                color: #c4b5fd;
+                font-size: 10px;
+                font-weight: 800;
+                letter-spacing: .06em;
+                text-transform: uppercase;
+            }
+            #${HISTORY_DIALOG_ID} .dh-daily-row,
+            #${HISTORY_DIALOG_ID} .dh-movement-row,
+            #${HISTORY_DIALOG_ID} .dh-last-row {
+                padding: 4px 0;
+                border-top: 1px solid #333;
+                color: #ccc;
+                font-size: 12px;
+            }
+            #${HISTORY_DIALOG_ID} .dh-daily-row:first-of-type,
+            #${HISTORY_DIALOG_ID} .dh-movement-row:first-of-type,
+            #${HISTORY_DIALOG_ID} .dh-last-row:first-of-type { border-top: 0; }
+            #${HISTORY_DIALOG_ID} .dh-daily-row { display: grid; grid-template-columns: 82px 1fr; gap: 7px; }
+            #${HISTORY_DIALOG_ID} .dh-daily-date { color: #fff; font-weight: 700; }
+            #${HISTORY_DIALOG_ID} .dh-daily-row.dh-overbook .dh-daily-date { color: #ff8a8a; }
+            #${HISTORY_DIALOG_ID} .dh-movement-row.dh-move { color: #9cc5ff; }
+            #${HISTORY_DIALOG_ID} .dh-movement-row.dh-untracked { color: #f0b429; }
+            #${HISTORY_DIALOG_ID} .dh-movement-row.dh-stay { color: #aaa; }
+            #${HISTORY_DIALOG_ID} .dh-last-row { display: flex; justify-content: space-between; gap: 8px; }
+            #${HISTORY_DIALOG_ID} .dh-last-location { color: #fff; font-weight: 650; }
+            #${HISTORY_DIALOG_ID} .dh-last-time { color: #aaa; white-space: nowrap; }
+            #${HISTORY_DIALOG_ID} .dh-note { margin: 6px 0 10px; color: #999; font-size: 11px; }
+            #${HISTORY_DIALOG_ID} .dh-columns {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 12px;
+                align-items: start;
+            }
+            #${HISTORY_DIALOG_ID} .dh-branch {
+                min-width: 0;
+                padding: 10px 11px;
+                border: 1px solid #444;
+                border-radius: 8px;
+                background: #181818;
+            }
+            #${HISTORY_DIALOG_ID} .dh-branch-title {
+                margin-bottom: 8px;
+                color: #c4b5fd;
+                font-size: 11px;
+                font-weight: 800;
+                letter-spacing: .06em;
+                text-transform: uppercase;
+            }
+            #${HISTORY_DIALOG_ID} .dh-hall { margin-top: 8px; color: #fff; font-weight: 700; }
+            #${HISTORY_DIALOG_ID} .dh-date {
+                margin-top: 7px;
+                color: #fff;
+                font-size: 12px;
+                font-weight: 750;
+            }
+            #${HISTORY_DIALOG_ID} .dh-date.dh-overbook { color: #ff8a8a; }
+            #${HISTORY_DIALOG_ID} .dh-occurrence { padding: 2px 0 2px 10px; border-left: 2px solid #555; color: #ccc; font-size: 12px; }
+            #${HISTORY_DIALOG_ID} .dh-occurrence a { color: inherit; text-decoration: underline; }
+            #${HISTORY_DIALOG_ID} .dh-empty { color: #999; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] {
+                color: #333;
+                background: #fff;
+                border-color: #dfe3e8;
+                box-shadow: 0 6px 24px #1f2d3d26;
+            }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-label,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-status { color: #828b95; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] select,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] input { background: #f4f6f8; border-color: #d5dae0; color: #333; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-run { background: var(--ui-color-primary, #2067b0); border-color: var(--ui-color-primary, #2067b0); color: #fff; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-result { border-top-color: #e6e9ed; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-gaps { background: #fff7d6; color: #8b6500; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-summary,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-hall,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-date { color: #2b2f36; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-summary-sub { color: #68727d; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-audit-head,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-audit-card { background: #f4f6f8; border-color: #e0e4e9; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-metric,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-movement-row,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-daily-row,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-last-row { color: #4b5560; border-top-color: #e0e4e9; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-metric strong,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-daily-date,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-last-location { color: #2b2f36; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-metric.dh-danger strong,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-daily-row.dh-overbook .dh-daily-date { color: #b91c1c; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-metric.dh-ok strong { color: #177245; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-movement-row.dh-move { color: #245ea8; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-movement-row.dh-untracked { color: #8b6500; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-movement-row.dh-stay,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-last-time { color: #68727d; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-note { color: #7d8791; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-date.dh-overbook { color: #b91c1c; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-branch-title { color: var(--ui-color-primary, #2067b0); }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-branch { background: #f4f6f8; border-color: #e0e4e9; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-occurrence { border-left-color: #c8ced6; color: #4b5560; }
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-close,
+            #${HISTORY_DIALOG_ID}[data-skin="light"] .dh-copy { border-color: #cfd5db; color: #4b5560; }
+            @media (max-width: 620px) {
+                #${HISTORY_DIALOG_ID} .dh-form { grid-template-columns: 1fr 1fr; }
+                #${HISTORY_DIALOG_ID} .dh-label:first-child { grid-column: 1 / -1; }
+                #${HISTORY_DIALOG_ID} .dh-audit-grid { grid-template-columns: 1fr; }
+                #${HISTORY_DIALOG_ID} .dh-columns { grid-template-columns: 1fr; }
+            }
         `,
         /* 4.6.0: светлое оформление в стиле Bitrix24 (белая карточка, акцент #2067b0).
          * Только перекраска: включается атрибутом data-skin="light" на корне панели,
@@ -3378,6 +3617,280 @@
             unknownHalls: day.unknownHalls,
             starCount: day.starCount,
             text: day.text
+        };
+    }
+
+    /* Дни в закрытом диапазоне по календарю Москвы. */
+    function historyDays(from, to, maxDays = 31) {
+        const start = String(from || '');
+        const finish = String(to || '');
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(finish)) return null;
+
+        const startTime = Date.parse(`${start}T00:00:00Z`);
+        const finishTime = Date.parse(`${finish}T00:00:00Z`);
+
+        if (!Number.isFinite(startTime) || !Number.isFinite(finishTime) || startTime > finishTime) return null;
+        if (new Date(startTime).toISOString().slice(0, 10) !== start ||
+            new Date(finishTime).toISOString().slice(0, 10) !== finish) return null;
+
+        const count = Math.floor((finishTime - startTime) / 86400000) + 1;
+
+        if (count < 1 || count > maxDays) return null;
+
+        return Array.from({ length: count }, (_, index) => shiftDay(start, index));
+    }
+
+    /*
+     * История выбранной позиции. entries: [{ day: 'YYYY-MM-DD', records: [...] }].
+     * В результат попадает каждая бронь с количеством позиции, а также календарные
+     * дни без использования между первой и последней найденной датой.
+     */
+    function summarizeEquipmentHistory(entries, equipment) {
+        const selected = findEquipment(equipment);
+
+        if (!selected) return { name: '', totalBookings: 0, totalDays: 0, branches: [], gaps: [], dailyTotals: [] };
+
+        const branches = new Map();
+        const usedDays = new Set();
+        const dailyTotals = new Map();
+        let totalBookings = 0;
+
+        (entries || []).forEach(entry => {
+            const day = String(entry && entry.day || '');
+
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+
+            (entry.records || []).forEach(record => {
+                const branch = categoryFromHall(record && record.hall);
+                const hall = hallLabel(record && record.hall);
+                const found = recordEquipment(record).get(selected.key);
+
+                if (!branch || !hall || !found || !(found.qty > 0)) return;
+
+                if (!branches.has(branch)) {
+                    branches.set(branch, { category: branch, name: branch === 'P' ? 'Павелецкая' : 'Серпуховская', days: new Map() });
+                }
+
+                const branchEntry = branches.get(branch);
+
+                if (!branchEntry.days.has(day)) branchEntry.days.set(day, new Map());
+                const dayEntry = branchEntry.days.get(day);
+
+                if (!dayEntry.has(hall)) dayEntry.set(hall, []);
+                dayEntry.get(hall).push({
+                    day,
+                    id: record.id || '',
+                    start: record.start,
+                    end: record.end,
+                    qty: found.qty
+                });
+                usedDays.add(day);
+                dailyTotals.set(day, (dailyTotals.get(day) || 0) + found.qty);
+                totalBookings += 1;
+            });
+        });
+
+        const sortOccurrence = (a, b) => (a.start ?? 1e9) - (b.start ?? 1e9) || String(a.id).localeCompare(String(b.id));
+        const resultBranches = [...branches.values()]
+            .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+            .map(branch => ({
+                category: branch.category,
+                name: branch.name,
+                days: [...branch.days.entries()]
+                    .sort((a, b) => a[0].localeCompare(b[0]))
+                    .map(([day, halls]) => ({
+                        day,
+                        halls: [...halls.entries()]
+                            .sort((a, b) => hallNumber(a[0]) - hallNumber(b[0]) || a[0].localeCompare(b[0], 'ru'))
+                            .map(([hall, occurrences]) => ({ hall, occurrences: occurrences.sort(sortOccurrence) }))
+                    }))
+            }));
+
+        const sortedDays = [...usedDays].sort();
+        const gaps = [];
+
+        for (let index = 1; index < sortedDays.length; index += 1) {
+            const from = shiftDay(sortedDays[index - 1], 1);
+            const to = shiftDay(sortedDays[index], -1);
+
+            if (from <= to) gaps.push({ from, to });
+        }
+
+        return {
+            name: selected.name,
+            key: selected.key,
+            totalBookings,
+            totalDays: usedDays.size,
+            branches: resultBranches,
+            gaps,
+            dailyTotals: [...dailyTotals.entries()]
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([day, qty]) => ({ day, qty }))
+        };
+    }
+
+    /*
+     * Аудит движения позиции между бронями. В карточках Bitrix нет серийных
+     * номеров, поэтому передача строится как наиболее вероятная связь по времени:
+     * освободившаяся позиция из предыдущей брони сопоставляется со следующей
+     * бронью, сначала в том же зале, затем в ближайшем зале филиала.
+     */
+    function analyzeEquipmentMovement(entries, equipment, totalUnits = 1) {
+        const selected = findEquipment(equipment);
+        const units = Number.isInteger(totalUnits) && totalUnits > 0 ? totalUnits : 1;
+
+        if (!selected) {
+            return {
+                name: '', totalUnits: units, bookings: [], movements: [], daily: [],
+                peakConcurrent: 0, totalBookedQty: 0, shortageDays: [], untrackedQty: 0, lastKnown: []
+            };
+        }
+
+        const bookings = [];
+        (entries || []).forEach(entry => {
+            const day = String(entry && entry.day || '');
+
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+
+            (entry.records || []).forEach(record => {
+                const branch = categoryFromHall(record && record.hall);
+                const hall = hallLabel(record && record.hall);
+                const found = recordEquipment(record).get(selected.key);
+
+                if (!branch || !hall || !found || !(found.qty > 0)) return;
+
+                const start = Number.isFinite(record.start) ? record.start : 0;
+                let end = Number.isFinite(record.end) ? record.end : start;
+                if (end < start) end += 1440;
+
+                const dayStart = Date.parse(`${day}T00:00:00Z`) / 60000;
+                if (!Number.isFinite(dayStart)) return;
+
+                bookings.push({
+                    day,
+                    id: record.id || '',
+                    branch,
+                    branchName: branch === 'P' ? 'Павелецкая' : 'Серпуховская',
+                    hall,
+                    start,
+                    end: Number.isFinite(end) ? end : start,
+                    startAbs: dayStart + start,
+                    endAbs: dayStart + Math.max(end, start + 1),
+                    qty: found.qty
+                });
+            });
+        });
+
+        bookings.sort((a, b) => a.startAbs - b.startAbs || a.endAbs - b.endAbs || String(a.id).localeCompare(String(b.id)));
+        const locationName = row => `${row.branchName}, ${row.hall}`;
+        const movementRows = [];
+        const lots = [];
+        let untrackedQty = 0;
+        let openingQty = 0;
+
+        bookings.forEach(target => {
+            const available = lots
+                .filter(lot => lot.remaining > 0 && lot.endAbs <= target.startAbs)
+                .sort((a, b) => {
+                    const aSame = a.branch === target.branch && a.hall === target.hall;
+                    const bSame = b.branch === target.branch && b.hall === target.hall;
+                    const aScore = aSame ? 0 : (a.branch === target.branch ? 10 + hallDistance(a.hall, target.hall) : 100 + hallDistance(a.hall, target.hall));
+                    const bScore = bSame ? 0 : (b.branch === target.branch ? 10 + hallDistance(b.hall, target.hall) : 100 + hallDistance(b.hall, target.hall));
+                    return aScore - bScore || b.endAbs - a.endAbs;
+                });
+
+            let remaining = target.qty;
+            available.forEach(source => {
+                if (remaining <= 0) return;
+
+                const qty = Math.min(remaining, source.remaining);
+                source.remaining -= qty;
+                remaining -= qty;
+
+                movementRows.push({
+                    kind: source.branch === target.branch && source.hall === target.hall ? 'stay' : 'move',
+                    qty,
+                    from: { day: source.day, start: source.start, end: source.end, branch: source.branch, branchName: source.branchName, hall: source.hall, id: source.id },
+                    to: { day: target.day, start: target.start, end: target.end, branch: target.branch, branchName: target.branchName, hall: target.hall, id: target.id }
+                });
+            });
+
+            if (remaining > 0) {
+                const isOpening = lots.length === 0 && available.length === 0;
+                if (isOpening) openingQty += remaining;
+                else untrackedQty += remaining;
+                movementRows.push({
+                    kind: isOpening ? 'opening' : 'untracked',
+                    qty: remaining,
+                    from: null,
+                    to: { day: target.day, start: target.start, end: target.end, branch: target.branch, branchName: target.branchName, hall: target.hall, id: target.id }
+                });
+            }
+
+            lots.push({ ...target, remaining: target.qty });
+        });
+
+        const usedDays = [...new Set(bookings.map(item => item.day))].sort();
+        const daily = usedDays.map(day => {
+            const dayStart = Date.parse(`${day}T00:00:00Z`) / 60000;
+            const dayEnd = dayStart + 1440;
+            const events = [];
+            let bookedQty = 0;
+
+            bookings.forEach(item => {
+                if (item.day === day) bookedQty += item.qty;
+                if (item.startAbs >= dayEnd || item.endAbs <= dayStart) return;
+                events.push({ minute: Math.max(item.startAbs, dayStart), delta: item.qty, order: 1 });
+                events.push({ minute: Math.min(item.endAbs, dayEnd), delta: -item.qty, order: 0 });
+            });
+
+            events.sort((a, b) => a.minute - b.minute || a.order - b.order);
+            let concurrent = 0;
+            let peakConcurrent = 0;
+            events.forEach(event => {
+                concurrent += event.delta;
+                peakConcurrent = Math.max(peakConcurrent, concurrent);
+            });
+
+            return {
+                day,
+                bookedQty,
+                peakConcurrent,
+                balance: units - peakConcurrent,
+                shortage: Math.max(0, peakConcurrent - units)
+            };
+        });
+
+        const lastKnown = [];
+        const latestByLocation = new Map();
+        bookings.forEach(item => {
+            const key = `${item.branch}:${item.hall}`;
+            const current = latestByLocation.get(key);
+            if (!current || item.endAbs > current.endAbs) latestByLocation.set(key, item);
+        });
+        [...latestByLocation.values()]
+            .sort((a, b) => b.endAbs - a.endAbs)
+            .forEach(item => lastKnown.push({
+                day: item.day, start: item.start, end: item.end, qty: item.qty,
+                branch: item.branch, branchName: item.branchName, hall: item.hall, id: item.id
+            }));
+
+        return {
+            name: selected.name,
+            key: selected.key,
+            totalUnits: units,
+            bookings,
+            movements: movementRows,
+            transfers: movementRows.filter(item => item.kind === 'move'),
+            stays: movementRows.filter(item => item.kind === 'stay'),
+            openingQty,
+            untrackedQty,
+            totalBookedQty: bookings.reduce((sum, item) => sum + item.qty, 0),
+            daily,
+            peakConcurrent: daily.reduce((max, item) => Math.max(max, item.peakConcurrent), 0),
+            shortageDays: daily.filter(item => item.shortage > 0),
+            lastKnown
         };
     }
 
@@ -6020,6 +6533,7 @@
                 STYLES.settings,
                 STYLES.actions,
                 STYLES.dayDialog,
+                STYLES.historyDialog,
                 STYLES.skin,
                 STYLES.native,
                 STYLES.v5,
@@ -6761,6 +7275,12 @@
                 title: 'Посчитать, что не нужно разбирать на завтра'
             }, ['Не разбирать на завтра…']));
 
+            bar.appendChild(el('button', {
+                type: 'button',
+                className: 'da-btn da-history',
+                title: 'Найти прибор по броням обоих филиалов за выбранный период'
+            }, ['Где был прибор за период…']));
+
             const dialog = document.createElement('div');
             dialog.id = DAY_DIALOG_ID;
             dialog.hidden = true;
@@ -6802,6 +7322,295 @@
             ]));
 
             document.body.appendChild(dialog);
+
+            /* Поиск позиции по истории броней обоих филиалов. */
+            const historyDialog = document.createElement('div');
+            historyDialog.id = HISTORY_DIALOG_ID;
+            historyDialog.hidden = true;
+            historyDialog.appendChild(el('div', { className: 'dh-head' }, [
+                el('span', {}, ['Где был прибор за период']),
+                el('span', { className: 'dh-head-actions' }, [
+                    el('button', { type: 'button', className: 'dh-copy', disabled: 'disabled', title: 'Скопировать результат' }, ['Скопировать']),
+                    el('button', { type: 'button', className: 'dh-close', 'aria-label': 'Закрыть' }, ['✕'])
+                ])
+            ]));
+
+            const historyForm = el('div', { className: 'dh-form' }, [
+                el('label', { className: 'dh-label' }, [
+                    'Позиция',
+                    el('select', { className: 'dh-equipment' }, EQUIPMENT.map(([name]) => el('option', { value: name }, [name])))
+                ]),
+                el('label', { className: 'dh-label' }, ['Всего приборов', el('input', { className: 'dh-total', type: 'number', min: '1', max: '100', step: '1', value: '1' })]),
+                el('label', { className: 'dh-label' }, ['С', el('input', { className: 'dh-from', type: 'date' })]),
+                el('label', { className: 'dh-label' }, ['По', el('input', { className: 'dh-to', type: 'date' })]),
+                el('button', { type: 'button', className: 'dh-run' }, ['Найти'])
+            ]);
+
+            const historyStatus = el('div', { className: 'dh-status', 'aria-live': 'polite' });
+            const historyResult = el('div', { className: 'dh-result' }, [
+                el('div', { className: 'dh-empty' }, ['Выберите позицию и период, затем нажмите «Найти».'])
+            ]);
+
+            historyDialog.append(historyForm, historyStatus, historyResult);
+            document.body.appendChild(historyDialog);
+
+            const historyFrom = historyDialog.querySelector('.dh-from');
+            const historyTo = historyDialog.querySelector('.dh-to');
+            const historyTotal = historyDialog.querySelector('.dh-total');
+            const historySelect = historyDialog.querySelector('.dh-equipment');
+            const historyRun = historyDialog.querySelector('.dh-run');
+            const historyCopy = historyDialog.querySelector('.dh-copy');
+            let historyRunToken = 0;
+            let historyCopyText = '';
+
+            historyFrom.value = shiftDay(baseDayIso(), -6);
+            historyTo.value = baseDayIso();
+
+            const placeHistoryDialog = () => {
+                const width = Math.min(980, window.innerWidth - 16);
+                const height = Math.min(historyDialog.scrollHeight || 420, window.innerHeight - 16);
+
+                historyDialog.style.left = Math.max(8, (window.innerWidth - width) / 2) + 'px';
+                historyDialog.style.top = Math.max(8, (window.innerHeight - height) / 2) + 'px';
+            };
+
+            const historyDateLabel = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
+            const historyDateShort = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
+            const historyDateLong = iso => {
+                const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+                return `${iso.slice(8, 10)} ${months[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`;
+            };
+
+            const historyLocation = row => `${row.branchName}, ${row.hall}`;
+            const historyOccurrenceTime = row => Number.isFinite(row.start) && Number.isFinite(row.end)
+                ? `${formatClock(row.start)}–${formatClock(row.end)}`
+                : 'время не указано';
+
+            function addHistoryOccurrenceText(occurrence) {
+                const time = Number.isFinite(occurrence.start) && Number.isFinite(occurrence.end)
+                    ? `${formatClock(occurrence.start)}–${formatClock(occurrence.end)}`
+                    : 'время не указано';
+
+                return `${time} · ${qtyText(occurrence.qty)}`;
+            }
+
+            function renderHistory(summary, movement) {
+                historyResult.replaceChildren();
+                historyCopyText = '';
+                historyCopy.disabled = true;
+
+                if (!summary.totalBookings) {
+                    historyResult.appendChild(el('div', { className: 'dh-empty' }, ['За выбранный период позиция в активных бронях не найдена.']));
+                    return;
+                }
+
+                const totalUnits = Math.max(1, Math.floor(Number(historyTotal.value) || 1));
+                const dailyByDay = new Map((movement.daily || []).map(item => [item.day, item]));
+                const transfersQty = (movement.transfers || []).reduce((sum, item) => sum + item.qty, 0);
+                const shortageText = movement.shortageDays.length
+                    ? `дефицит ${formatQuantity(Math.max(...movement.shortageDays.map(item => item.shortage)))} шт.`
+                    : `свободно ${formatQuantity(Math.max(0, totalUnits - movement.peakConcurrent))} шт.`;
+                const periodStart = summary.dailyTotals[0] ? historyDateShort(summary.dailyTotals[0].day) : '';
+                const periodEnd = summary.dailyTotals.length ? historyDateShort(summary.dailyTotals[summary.dailyTotals.length - 1].day) : periodStart;
+                const textLines = [
+                    `${summary.name} · ${periodStart}–${periodEnd}`,
+                    `Учёт: ${totalUnits} шт. · заявлено в бронях: ${formatQuantity(movement.totalBookedQty)} шт. · броней: ${summary.totalBookings} · дней: ${summary.totalDays}`,
+                    `Пик одновременно: ${movement.peakConcurrent}/${totalUnits} шт. · ${shortageText}`,
+                    `Передачи между филиалами: ${formatQuantity(transfersQty)} шт. · без предыдущей брони: ${formatQuantity(movement.untrackedQty)} шт.`,
+                    `На первой найденной брони: ${formatQuantity(movement.openingQty)} шт.`
+                ];
+
+                const summaryRow = el('div', { className: 'dh-summary-row' }, [
+                    el('div', { className: 'dh-summary' }, [textLines[0], el('div', { className: 'dh-summary-sub' }, [textLines[1]])]),
+                    historyCopy
+                ]);
+                historyResult.appendChild(summaryRow);
+
+                if (summary.gaps.length) {
+                    const gapLines = summary.gaps.map(gap => {
+                        const label = gap.from === gap.to
+                            ? historyDateLong(gap.from)
+                            : `с ${historyDateLong(gap.from)} по ${historyDateLong(gap.to)}`;
+                        return `${label} — прибор не использовался`;
+                    });
+                    const gapCopyLines = summary.gaps.map(gap => `${historyDateShort(gap.from)}${gap.from === gap.to ? '' : `–${historyDateShort(gap.to)}`} — без использования`);
+                    const gapBox = el('div', { className: 'dh-gaps' }, gapLines.map(line => el('div', {}, [line])));
+                    historyResult.appendChild(gapBox);
+                    textLines.push('', 'Паузы:', ...gapCopyLines);
+                }
+
+                const audit = el('div', { className: 'dh-audit' });
+                const auditHead = el('div', { className: 'dh-audit-head' }, [
+                    el('span', { className: 'dh-metric' }, ['Пик одновременно: ', el('strong', {}, [`${formatQuantity(movement.peakConcurrent)}/${totalUnits}`])]),
+                    el('span', { className: 'dh-metric' }, ['Заявлено: ', el('strong', {}, [`${formatQuantity(movement.totalBookedQty)} шт.`])]),
+                    el('span', { className: movement.shortageDays.length ? 'dh-metric dh-danger' : 'dh-metric dh-ok' }, [shortageText]),
+                    el('span', { className: 'dh-metric' }, ['Передачи: ', el('strong', {}, [`${formatQuantity(transfersQty)} шт.`])]),
+                    el('span', { className: movement.untrackedQty ? 'dh-metric dh-danger' : 'dh-metric dh-ok' }, ['Без источника: ', el('strong', {}, [`${formatQuantity(movement.untrackedQty)} шт.`])]),
+                    el('span', { className: 'dh-metric' }, ['Начало периода: ', el('strong', {}, [`${formatQuantity(movement.openingQty)} шт.`])])
+                ]);
+                audit.appendChild(auditHead);
+
+                const auditGrid = el('div', { className: 'dh-audit-grid' });
+                const dailyCard = el('div', { className: 'dh-audit-card' }, [el('div', { className: 'dh-audit-title' }, ['По датам'])]);
+                (movement.daily || []).forEach(item => {
+                    const row = el('div', { className: item.shortage ? 'dh-daily-row dh-overbook' : 'dh-daily-row' }, [
+                        el('span', { className: 'dh-daily-date' }, [historyDateLabel(item.day)]),
+                        el('span', {}, [`заявлено ${formatQuantity(item.bookedQty)} · одновременно ${formatQuantity(item.peakConcurrent)} · ${item.shortage ? `дефицит ${formatQuantity(item.shortage)}` : `свободно ${formatQuantity(item.balance)}`} шт.`])
+                    ]);
+                    dailyCard.appendChild(row);
+                });
+                auditGrid.appendChild(dailyCard);
+
+                const movementCard = el('div', { className: 'dh-audit-card' }, [el('div', { className: 'dh-audit-title' }, ['Перемещения'])]);
+                const visibleMovements = (movement.movements || []).filter(item => item.kind === 'move' || item.kind === 'untracked');
+                if (!visibleMovements.length) movementCard.appendChild(el('div', { className: 'dh-empty' }, ['Переходов между залами по времени броней не найдено.']));
+                visibleMovements.slice(0, 30).forEach(item => {
+                    const target = item.to;
+                    const prefix = `${historyDateLabel(target.day)} ${formatClock(target.start)}`;
+                    const text = item.kind === 'untracked'
+                        ? `${prefix} · ${historyLocation(target)} · ${formatQuantity(item.qty)} шт. · нет предыдущей брони`
+                        : `${prefix} · ${historyLocation(item.from)} → ${historyLocation(target)} · ${formatQuantity(item.qty)} шт.`;
+                    movementCard.appendChild(el('div', { className: `dh-movement-row dh-${item.kind}` }, [text]));
+                });
+                auditGrid.appendChild(movementCard);
+
+                const lastCard = el('div', { className: 'dh-audit-card', style: 'grid-column: 1 / -1' }, [el('div', { className: 'dh-audit-title' }, ['Последние известные точки'])]);
+                (movement.lastKnown || []).slice(0, 8).forEach(item => {
+                    lastCard.appendChild(el('div', { className: 'dh-last-row' }, [
+                        el('span', { className: 'dh-last-location' }, [`${historyLocation(item)} · ${formatQuantity(item.qty)} шт.`]),
+                        el('span', { className: 'dh-last-time' }, [`${historyDateLabel(item.day)} ${historyOccurrenceTime(item)}`])
+                    ]));
+                });
+                auditGrid.appendChild(lastCard);
+                audit.appendChild(auditGrid);
+                historyResult.appendChild(audit);
+                historyResult.appendChild(el('div', { className: 'dh-note' }, ['Связи «откуда → куда» построены по времени броней и количеству: серийных номеров в CRM нет.']));
+
+                textLines.push('', 'По датам:');
+                (movement.daily || []).forEach(item => {
+                    textLines.push(`${historyDateShort(item.day)} — заявлено ${formatQuantity(item.bookedQty)} шт.; одновременно ${formatQuantity(item.peakConcurrent)}; ${item.shortage ? `дефицит ${formatQuantity(item.shortage)}` : `свободно ${formatQuantity(item.balance)}`}`);
+                });
+                if (visibleMovements.length) {
+                    textLines.push('', 'Перемещения:');
+                    visibleMovements.slice(0, 30).forEach(item => {
+                        const target = item.to;
+                        textLines.push(item.kind === 'untracked'
+                            ? `${historyDateShort(target.day)} ${formatClock(target.start)} — ${historyLocation(target)} — ${formatQuantity(item.qty)} шт. (нет предыдущей брони)`
+                            : `${historyDateShort(target.day)} ${formatClock(target.start)} — ${historyLocation(item.from)} → ${historyLocation(target)} — ${formatQuantity(item.qty)} шт.`);
+                    });
+                }
+                textLines.push('', 'Последние точки:');
+                (movement.lastKnown || []).slice(0, 8).forEach(item => {
+                    textLines.push(`${historyDateShort(item.day)} ${historyOccurrenceTime(item)} — ${historyLocation(item)} — ${formatQuantity(item.qty)} шт.`);
+                });
+
+                const columns = el('div', { className: 'dh-columns' });
+
+                textLines.push('', 'Брони по филиалам:');
+                summary.branches.forEach(branch => {
+                    const branchLines = [];
+                    const branchNode = el('div', { className: 'dh-branch' }, [
+                        el('div', { className: 'dh-branch-title' }, [branch.name])
+                    ]);
+
+                    branch.days.forEach(dayEntry => {
+                        const daily = dailyByDay.get(dayEntry.day);
+                        const dailyLabel = `${historyDateLabel(dayEntry.day)} · ${formatQuantity(daily ? daily.bookedQty : 0)} шт. заявлено · одновременно ${formatQuantity(daily ? daily.peakConcurrent : 0)}`;
+                        const dailyClass = daily && daily.shortage ? 'dh-date dh-overbook' : 'dh-date';
+                        branchNode.appendChild(el('div', { className: dailyClass }, [dailyLabel]));
+                        branchLines.push('');
+
+                        dayEntry.halls.forEach(hall => {
+                            branchNode.appendChild(el('div', { className: 'dh-hall' }, [hall.hall]));
+                            hall.occurrences.forEach(occurrence => {
+                                const row = el('div', { className: 'dh-occurrence' }, [`${addHistoryOccurrenceText(occurrence)} `]);
+                                const text = addHistoryOccurrenceText(occurrence);
+
+                                if (occurrence.id) {
+                                    row.appendChild(el('a', {
+                                        href: `/crm/deal/details/${encodeURIComponent(occurrence.id)}/`,
+                                        target: '_blank',
+                                        rel: 'noopener'
+                                    }, [`бронь ${occurrence.id}`]));
+                                    branchLines.push(`${historyDateShort(dayEntry.day)} · ${hall.hall} · ${text} · #${occurrence.id}`);
+                                } else {
+                                    branchLines.push(`${historyDateShort(dayEntry.day)} · ${hall.hall} · ${text}`);
+                                }
+
+                                branchNode.appendChild(row);
+                            });
+                        });
+                    });
+
+                    columns.appendChild(branchNode);
+                    textLines.push(`${branch.name}:`, ...branchLines);
+                });
+
+                historyResult.appendChild(columns);
+                historyCopyText = textLines.join('\n');
+                historyCopy.disabled = false;
+            }
+
+            async function runHistorySearch() {
+                const days = historyDays(historyFrom.value, historyTo.value);
+                const totalUnits = Number(historyTotal.value);
+
+                if (!days || !Number.isInteger(totalUnits) || totalUnits < 1 || totalUnits > 100) {
+                    historyStatus.classList.add('dh-warn');
+                    historyStatus.textContent = 'Укажите корректный период до 31 дня и целое количество приборов от 1 до 100.';
+                    return;
+                }
+
+                const token = ++historyRunToken;
+                historyRun.disabled = true;
+                historyCopy.disabled = true;
+                historyStatus.classList.remove('dh-warn');
+                historyResult.replaceChildren();
+                const entries = [];
+                const failed = [];
+
+                for (let index = 0; index < days.length; index += 1) {
+                    if (token !== historyRunToken) return;
+
+                    const day = days[index];
+                    historyStatus.textContent = `Загружаю ${historyDateLabel(day)} (${index + 1}/${days.length})…`;
+                    const entry = await loadDay(day);
+
+                    if (entry && entry.records) entries.push({ day, records: entry.records });
+                    else failed.push(`${historyDateLabel(day)}: ${(entry && entry.error) || 'нет данных'}`);
+                }
+
+                const summary = summarizeEquipmentHistory(entries, historySelect.value);
+                const movement = analyzeEquipmentMovement(entries, historySelect.value, totalUnits);
+                renderHistory(summary, movement);
+                historyStatus.classList.toggle('dh-warn', failed.length > 0);
+                historyStatus.textContent = failed.length
+                    ? `Готово частично: не загружено дней ${failed.length}. ${failed.slice(0, 2).join('; ')}`
+                    : `Готово: проверено дней ${days.length}.`;
+                historyRun.disabled = false;
+                placeHistoryDialog();
+            }
+
+            historyDialog.querySelector('.dh-close').addEventListener('click', () => { historyDialog.hidden = true; });
+            historyRun.addEventListener('click', runHistorySearch);
+            historyCopy.addEventListener('click', async () => {
+                if (!historyCopyText) return;
+                const ok = await copyText(historyCopyText);
+                showCopyToast(historyCopyText, ok);
+            });
+            window.addEventListener('resize', () => { if (!historyDialog.hidden) placeHistoryDialog(); });
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && !historyDialog.hidden) historyDialog.hidden = true;
+            });
+
+            bar.querySelector('.da-history').addEventListener('click', () => {
+                historyDialog.hidden = !historyDialog.hidden;
+                if (!historyDialog.hidden) {
+                    historyFrom.value = historyFrom.value || shiftDay(baseDayIso(), -6);
+                    historyTo.value = historyTo.value || baseDayIso();
+                    placeHistoryDialog();
+                }
+            });
 
             const result = dialog.querySelector('.dd-result');
 
@@ -7600,7 +8409,7 @@
             const value = SKINS.includes(skin) ? skin : DEFAULT_SKIN;
 
             root.dataset.skin = value;
-            [DAY_DIALOG_ID, TOAST_ID].forEach(id => {
+            [DAY_DIALOG_ID, HISTORY_DIALOG_ID, TOAST_ID].forEach(id => {
                 const node = document.getElementById(id);
 
                 if (node) node.dataset.skin = value;
@@ -7769,7 +8578,7 @@
             /* Окно-«попап» под кнопкой: закрывается кликом снаружи и Esc. Диалог дня — часть панели. */
             document.addEventListener('pointerdown', event => {
                 if (root.dataset.mode !== 'header' || collapsed) return;
-                if (root.contains(event.target) || event.target.closest(`#${CHIP_ID}, #${DAY_DIALOG_ID}`)) return;
+                if (root.contains(event.target) || event.target.closest(`#${CHIP_ID}, #${DAY_DIALOG_ID}, #${HISTORY_DIALOG_ID}`)) return;
 
                 setCollapsed(root, true);
             }, true);
@@ -8862,7 +9671,7 @@
             findHallName, formatClock,
             buildDayList, parseDayList, analyzeTomorrow, computePayout,
             validateCollectorPayload, encodeRequest, decodeRequest, shortEquipmentName, bookingCopyLine,
-            moscowDay, dayBounds, moscowParts, shiftDay, calendarDayIso, dealToRecord, recordsOfCategory, recordEquipment, summarizeEquipment, findDuplicateRows, planTomorrowTiles,
+            moscowDay, dayBounds, moscowParts, shiftDay, calendarDayIso, dealToRecord, recordsOfCategory, recordEquipment, summarizeEquipment, historyDays, summarizeEquipmentHistory, analyzeEquipmentMovement, findDuplicateRows, planTomorrowTiles,
             sanitizeFeatures, exportSettings, parseSettingsImport, FEATURE_KEYS, COLOR_ITEMS,
             money, formatAmount,
             EQUIPMENT, SERVICES, HOURS_BONUSES,
