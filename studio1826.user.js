@@ -2264,7 +2264,7 @@
         ['Текстиль Silk 12x12',1000],['Текстиль MBU 12x12',1000],
         ['Текстиль MBU 8x8',700],['Текстиль Grid 1/2 (SDL) 8x8',700],
         ['Frost-frame 6x6',1500],['T-frame set',500],
-        ['Frost-frame 122 set',600],['Cutter set',600],
+        ['Frost-frame 122 set',600],['Cutter set',400],
         ['Frost-frame 12x12',3000],['Текстиль Grid 1/2 6х6',500],
         ['Текстиль Grid Full (SD) 8x8',700],['Текстиль Silk 8x8',700],
         ['Текстиль Grid 1/2 (SDL) 12х12',1000],
@@ -3621,7 +3621,7 @@
     }
 
     /* Дни в закрытом диапазоне по календарю Москвы. */
-    function historyDays(from, to, maxDays = 31) {
+    function historyDays(from, to, maxDays = 62) {
         const start = String(from || '');
         const finish = String(to || '');
 
