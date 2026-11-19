@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         v5.11.0 Studio 1826 — Расчёт администраторов и интерфейс
+// @name         v5.11.2 Studio 1826 — Расчёт администраторов и интерфейс
 // @namespace    studio1826
-// @version      5.11.0
+// @version      5.11.2
 // @description  Расчёт администраторов, копирование оборудования, информация по помещениям, тема и скрытие элементов Bitrix24 (в настройках)
 // @updateURL    https://raw.githubusercontent.com/zinovievilia/studio-1826-installer/main/studio1826.meta.js
 // @downloadURL  https://raw.githubusercontent.com/zinovievilia/studio-1826-installer/main/studio1826.user.js
@@ -14,7 +14,7 @@
 (function () {
     'use strict';
 
-    const VERSION = '5.11.0';
+    const VERSION = '5.11.2';
 
     const WIDGET_ID = 'studio1826-widget-v3';
     const STYLE_ID = 'studio1826-style-v3';
@@ -2315,7 +2315,27 @@
         ['USB to Micro-USB',500],
         ['HDMI to USB-C',500],
         ['HDMI to HDMI',500],
-        ['USB Type-C to Micro-USB 3.0',500]
+        ['USB Type-C to Micro-USB 3.0',500],
+        /* 5.11.1 (Илья) */
+        ['Монитор режиссерский TVLOGIC LVM-246 W 24',3500],
+        ['Софтбокс 90х120см - Profoto 3x4ft RF',0],
+        ['Beauty dish white',0],
+        ['Beauty dish silver',0],
+        ['Октобокс 150см - Profoto 5ft Octa',0],
+        ['Удлинитель-катушка 10 метров',200],
+        ['Kupo 186M Short Low Mighty Stand',300],
+        ['Frost-frame 122',200],
+        ['Октобокс 150см - Profoto 5ft Octa',0],
+        ['Kupo Swivel Coupler',100],
+        ['Удлинитель-катушка 30 метров',500],
+        ['Slap браслет',150],
+        ['Отражатель',0],
+        ['Frost-frame 60',200],
+        ['Reflector Aputure Storm LS 600D',500],
+        ['Видеосендер Сэт',2000],
+        ['Карта памяти SanDisk Extreme Pro 128Gb',6500],
+        ['Карта памяти SanDisk Extreme Pro 64Gb',4500],
+        ['Видео сендер HollyLand',1000]
     ];
 
     /* =========================================================
