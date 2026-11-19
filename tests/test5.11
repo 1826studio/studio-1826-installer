@@ -1,0 +1,386 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+
+const m = require(path.join('..', 'studio1826.user.js'));
+const fixture = require('./fixtures/day-2026-10-25.json');
+
+/* Брони дня из снимка Bitrix24 (24.10.2026): так же, как в fetchDayRecords — без отменённых (семантика F). */
+function recordsFromFixture(fx) {
+    return fx.deals
+        .filter(deal => deal.sem !== 'F')
+        .map(deal => m.dealToRecord({
+            ID: deal.id,
+            STAGE_ID: 'NEW',
+            UF_CRM_DATETIME_START: `${fx.day}T${deal.start}:00+03:00`,
+            UF_CRM_DATETIME_END: `${fx.day}T${deal.end}:00+03:00`
+        }, deal.rows.map(([name, qty]) => ({ PRODUCT_NAME: name, QUANTITY: qty }))));
+}
+
+test('moscowDay: сутки по Москве, а не по часовому поясу компьютера', () => {
+    /* 22:30 UTC 24.10 — это уже 01:30 25.10 в Москве */
+    const now = new Date('2026-10-24T22:30:00Z');
+
+    assert.equal(m.moscowDay(0, now), '2026-10-25');
+    assert.equal(m.moscowDay(1, now), '2026-10-26');
+    assert.equal(m.moscowDay(1, new Date('2026-10-24T20:30:00Z')), '2026-10-25');
+});
+
+test('moscowDay: переход через конец месяца и года', () => {
+    assert.equal(m.moscowDay(1, new Date('2026-10-31T10:00:00Z')), '2026-11-01');
+    assert.equal(m.moscowDay(1, new Date('2026-12-31T10:00:00Z')), '2027-01-01');
+});
+
+test('dayBounds: [00:00 дня, 00:00 следующего дня) по Москве', () => {
+    assert.deepEqual(m.dayBounds('2026-10-31'), { from: '2026-10-31T00:00:00+03:00', to: '2026-11-01T00:00:00+03:00' });
+    assert.deepEqual(m.dayBounds('2026-12-31'), { from: '2026-12-31T00:00:00+03:00', to: '2027-01-01T00:00:00+03:00' });
+});
+
+test('historyDays: строит включённый диапазон и ограничивает его 31 днём', () => {
+    assert.deepEqual(m.historyDays('2026-10-30', '2026-11-01'), [
+        '2026-10-30', '2026-10-31', '2026-11-01'
+    ]);
+    assert.equal(m.historyDays('2026-11-01', '2026-10-30'), null);
+    assert.equal(m.historyDays('2026-10-01', '2026-11-01'), null);
+    assert.equal(m.historyDays('не дата', '2026-11-01'), null);
+});
+
+test('moscowParts: минуты и дата по Москве из строки CRM с любым поясом', () => {
+    assert.deepEqual(m.moscowParts('2026-10-25T23:30:00+03:00'), { day: '2026-10-25', minutes: 1410 });
+    assert.deepEqual(m.moscowParts('2026-10-25T20:30:00Z'), { day: '2026-10-25', minutes: 1410 });
+    assert.deepEqual(m.moscowParts('2026-10-25T00:00:00+03:00'), { day: '2026-10-25', minutes: 0 });
+    assert.equal(m.moscowParts('не дата'), null);
+    assert.equal(m.moscowParts(null), null);
+});
+
+test('dealToRecord: зал, время и позиции в формате карточки календаря', () => {
+    const record = m.dealToRecord(
+        { ID: 7, STAGE_ID: 'NEW', UF_CRM_DATETIME_START: '2026-10-25T17:00:00+03:00', UF_CRM_DATETIME_END: '2026-10-25T19:00:00+03:00' },
+        [
+            { PRODUCT_NAME: 'Фон холщовый короткий Тёмный', QUANTITY: 1 },
+            { PRODUCT_NAME: 'Зал 75 (С)', QUANTITY: 2 },
+            { PRODUCT_NAME: 'Уборка', QUANTITY: '0.4' }
+        ]
+    );
+
+    assert.equal(record.id, '7');
+    assert.equal(record.hall, 'Зал 75 (С)');
+    assert.equal(record.start, 1020);
+    assert.equal(record.end, 1140);
+    assert.deepEqual(record.items, ['Фон холщовый короткий Тёмный - 1 шт.', 'Зал 75 (С) - 2 шт.', 'Уборка - 0,4 шт.']);
+});
+
+test('dealToRecord: без строки зала брони нет (null), пустые и битые данные не падают', () => {
+    assert.equal(m.dealToRecord({ ID: 1 }, [{ PRODUCT_NAME: 'Доплата за час', QUANTITY: 1 }]), null);
+    assert.equal(m.dealToRecord({ ID: 1 }, null), null);
+    assert.equal(m.dealToRecord({ ID: 1 }, []), null);
+
+    const record = m.dealToRecord({ ID: 2 }, [{ PRODUCT_NAME: 'Гримерное место 1 (П)', QUANTITY: 1 }]);
+
+    assert.equal(record.hall, 'Гримерное место 1 (П)');
+    assert.equal(record.start, null);
+    assert.equal(record.end, null);
+});
+
+test('снимок завтрашнего дня: 72 действующие брони, отменённая не попала', () => {
+    const records = recordsFromFixture(fixture);
+
+    assert.equal(records.length, 72);
+    assert.ok(!records.some(record => record.items.some(item => /Profoto Zoom 2 - 9 шт/.test(item))));
+});
+
+test('оборудование на завтра, Павелецкая: как в реальном списке (Зал 100, фон Песочный, 1 шт., без звёздочки)', () => {
+    const records = m.recordsOfCategory(recordsFromFixture(fixture), 'P');
+    const summary = m.summarizeEquipment(records);
+
+    assert.equal(summary.text, 'Зал 100\n1 шт. | Фон холщовый короткий Желто-коричневый - Песочный');
+    assert.equal(summary.starCount, 0);
+    assert.deepEqual(summary.totals, [{ name: 'Фон холщовый короткий Желто-коричневый - Песочный', qty: 1, halls: 1 }]);
+    assert.equal(summary.halls[0].items[0].sources.length, 1);
+    assert.equal(summary.halls[0].items[0].sources[0].start, 17 * 60);
+});
+
+test('оборудование на завтра, Серпуховская: два зала, источники и итог по студии', () => {
+    const summary = m.summarizeEquipment(m.recordsOfCategory(recordsFromFixture(fixture), 'C'));
+
+    assert.equal(summary.text, 'Зал 75\n1 шт. | Фон холщовый короткий Тёмный\n\nЗал 105\n2 шт. | Profoto Zoom 2');
+    assert.deepEqual(summary.totals.map(total => [total.name, total.qty]), [
+        ['Фон холщовый короткий Тёмный', 1],
+        ['Profoto Zoom 2', 2]
+    ]);
+    assert.deepEqual(summary.halls.map(hall => hall.label), ['Зал 75', 'Зал 105']);
+});
+
+test('итог по студии: между залами суммируется, внутри зала — максимум', () => {
+    const rec = (id, hall, start, end, item) => ({ id, hall, start, end, items: [`${hall} - 1 шт.`, item] });
+    const summary = m.summarizeEquipment([
+        rec('1', 'Зал 70 (С)', 600, 660, 'Profoto Zoom 2 - 2 шт.'),
+        rec('2', 'Зал 70 (С)', 720, 780, 'Profoto Zoom 2 - 3 шт.'),
+        rec('3', 'Зал 75 (С)', 600, 660, 'Profoto Zoom 2 - 1 шт.')
+    ]);
+
+    const total = summary.totals.find(item => item.name === 'Profoto Zoom 2');
+
+    /* Зал 70: максимум из 2 и 3 = 3; Зал 75: 1; всего 4 (а не 6 и не 3) */
+    assert.equal(total.qty, 4);
+    assert.equal(total.halls, 2);
+    assert.equal(summary.halls.find(hall => hall.label === 'Зал 70').items[0].sources.length, 2);
+});
+
+test('история позиции: оба филиала, залы, даты, время и количество', () => {
+    const history = m.summarizeEquipmentHistory([
+        {
+            day: '2026-10-30',
+            records: [
+                { id: '101', hall: 'Зал 70 (С)', start: 600, end: 720, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 2 шт.'] },
+                { id: '102', hall: 'Зал 100 (П)', start: 780, end: 900, items: ['Зал 100 (П) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }
+            ]
+        },
+        {
+            day: '2026-10-31',
+            records: [
+                { id: '103', hall: 'Зал 70 (С)', start: 900, end: 960, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 3 шт.'] }
+            ]
+        }
+    ], 'Profoto Zoom 2');
+
+    assert.equal(history.name, 'Profoto Zoom 2');
+    assert.equal(history.totalBookings, 3);
+    assert.equal(history.totalDays, 2);
+    assert.deepEqual(history.branches.map(branch => branch.name), ['Павелецкая', 'Серпуховская']);
+    assert.deepEqual(history.branches[0].days[0].halls[0].occurrences.map(item => [item.day, item.qty, item.id]), [
+        ['2026-10-30', 1, '102']
+    ]);
+    assert.deepEqual(history.branches[1].days.map(day => day.day), ['2026-10-30', '2026-10-31']);
+    assert.deepEqual(history.branches[1].days[0].halls[0].occurrences.map(item => [item.day, item.qty, item.id]), [
+        ['2026-10-30', 2, '101']
+    ]);
+    assert.deepEqual(history.dailyTotals, [
+        { day: '2026-10-30', qty: 3 },
+        { day: '2026-10-31', qty: 3 }
+    ]);
+    assert.deepEqual(history.gaps, []);
+});
+
+test('история позиции: между датами добавляется пауза без использования', () => {
+    const history = m.summarizeEquipmentHistory([
+        { day: '2026-11-16', records: [{ hall: 'Зал 70 (С)', start: 600, end: 660, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }] },
+        { day: '2026-11-20', records: [{ hall: 'Зал 70 (С)', start: 600, end: 660, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }] }
+    ], 'Profoto Zoom 2');
+
+    assert.deepEqual(history.gaps, [{ from: '2026-11-17', to: '2026-11-19' }]);
+});
+
+test('история позиции: неизвестный товар и записи без филиала не попадают в результат', () => {
+    const records = [{ day: '2026-10-30', records: [
+        { id: '1', hall: 'Зал 70', start: 600, end: 660, items: ['Profoto Zoom 2 - 1 шт.'] },
+        { id: '2', hall: 'Зал 70 (С)', start: 600, end: 660, items: ['Aputure 600d Pro - 1 шт.'] }
+    ] }];
+
+    assert.equal(m.summarizeEquipmentHistory(records, 'Profoto Zoom 2').totalBookings, 0);
+    assert.deepEqual(m.summarizeEquipmentHistory(records, 'нет такой позиции').branches, []);
+});
+
+test('аудит движения: связывает освобождённый прибор со следующей бронью и отмечает вход без источника', () => {
+    const audit = m.analyzeEquipmentMovement([
+        { day: '2026-11-16', records: [
+            { id: '101', hall: 'Зал 70 (С)', start: 600, end: 660, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }
+        ] },
+        { day: '2026-11-16', records: [
+            { id: '102', hall: 'Зал 100 (П)', start: 720, end: 780, items: ['Зал 100 (П) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }
+        ] },
+        { day: '2026-11-17', records: [
+            { id: '103', hall: 'Зал 100 (П)', start: 600, end: 660, items: ['Зал 100 (П) - 1 шт.', 'Profoto Zoom 2 - 2 шт.'] }
+        ] }
+    ], 'Profoto Zoom 2', 2);
+
+    assert.equal(audit.transfers.length, 1);
+    assert.deepEqual([audit.transfers[0].from.branchName, audit.transfers[0].from.hall, audit.transfers[0].to.branchName, audit.transfers[0].to.hall, audit.transfers[0].qty], [
+        'Серпуховская', 'Зал 70', 'Павелецкая', 'Зал 100', 1
+    ]);
+    assert.equal(audit.stays.length, 1);
+    assert.equal(audit.untrackedQty, 1);
+    assert.equal(audit.totalBookedQty, 4);
+    assert.equal(audit.daily[0].peakConcurrent, 1);
+    assert.equal(audit.peakConcurrent, 2);
+});
+
+test('аудит движения: считает одновременную нехватку относительно ручного остатка', () => {
+    const audit = m.analyzeEquipmentMovement([
+        { day: '2026-11-18', records: [
+            { id: '201', hall: 'Зал 70 (С)', start: 600, end: 900, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 2 шт.'] },
+            { id: '202', hall: 'Зал 75 (П)', start: 720, end: 840, items: ['Зал 75 (П) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }
+        ] }
+    ], 'Profoto Zoom 2', 2);
+
+    assert.equal(audit.peakConcurrent, 3);
+    assert.deepEqual(audit.shortageDays.map(item => [item.day, item.shortage]), [['2026-11-18', 1]]);
+});
+
+test('одна бронь не считается дважды, повторы внутри брони суммируются', () => {
+    const summary = m.summarizeEquipment([
+        { id: '1', hall: 'Зал 70 (С)', start: 600, end: 660, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }
+    ]);
+
+    assert.equal(summary.totals[0].qty, 2);
+    assert.equal(summary.halls[0].items[0].sources.length, 1);
+});
+
+test('пустые и некорректные данные: сводка не падает', () => {
+    assert.deepEqual(m.summarizeEquipment([]).halls, []);
+    assert.deepEqual(m.summarizeEquipment(null).halls, []);
+    assert.equal(m.recordsOfCategory(null, 'P').length, 0);
+    assert.equal(m.recordsOfCategory([{ hall: 'Зал без филиала' }], 'P').length, 0);
+});
+
+test('сводка из данных REST совпадает с buildDayList по тексту для всех залов дня', () => {
+    const records = recordsFromFixture(fixture);
+
+    ['C', 'P'].forEach(category => {
+        const filtered = m.recordsOfCategory(records, category);
+
+        assert.equal(m.summarizeEquipment(filtered).text, m.buildDayList(filtered).text);
+    });
+});
+
+test('findDuplicateRows: двойной ввод позиции в одной брони, «Доплата за час» не считается', () => {
+    const issues = m.findDuplicateRows([
+        { id: '1', hall: 'Зал 75 (П)', start: 600, items: ['Парковка (1 час) (П) - 8 шт.', 'Парковка (1 час) (П) - 8 шт.', 'Зал 75 (П) - 8 шт.'] },
+        { id: '2', hall: 'Зал 70 (С)', start: 660, items: ['Доплата за час - 1 шт.', 'Доплата за час - 1 шт.', 'Зал 70 (С) - 2 шт.'] },
+        { id: '3', hall: 'Зал 50 (С)', start: 700, items: ['Зал 50 (С) - 1 шт.'] }
+    ]);
+
+    assert.deepEqual(issues, [{ id: '1', hall: 'Зал 75 (П)', start: 600, names: ['Парковка (1 час) (П) ×2'] }]);
+    assert.deepEqual(m.findDuplicateRows(null), []);
+});
+
+test('planTomorrowTiles: плашка на зал утра — оставить, принести и откуда, собрать; стрелки от последних броней', () => {
+    const today = [
+        { hall: 'Зал 70 (С)', start: 600, end: 1260, items: ['Зал 70 (С) - 11 шт.', 'Profoto Zoom 2 - 2 шт.'] },
+        { hall: 'Зал 75 (С)', start: 900, end: 1200, items: ['Зал 75 (С) - 5 шт.', 'Фон холщовый короткий Тёмный - 1 шт.'] }
+    ];
+    const tomorrowRecords = [
+        { hall: 'Зал 75 (С)', start: 600, end: 720, items: ['Зал 75 (С) - 2 шт.', 'Фон холщовый короткий Тёмный - 1 шт.', 'Profoto Zoom 2 - 3 шт.'] },
+        { hall: 'Зал 75 (С)', start: 780, end: 840, items: ['Зал 75 (С) - 1 шт.'] }
+    ];
+    const tomorrow = m.parseDayList(m.buildDayList(tomorrowRecords).text);
+    const plan = m.planTomorrowTiles(m.analyzeTomorrow(today, tomorrow), tomorrowRecords);
+
+    assert.equal(plan.tiles.length, 1);
+    assert.equal(plan.tiles[0].hall, 'Зал 75');
+    assert.equal(plan.tiles[0].start, 600);
+    assert.deepEqual(plan.tiles[0].items.map(item => [item.kind, item.name, item.qty, item.from]), [
+        ['keep', 'Фон холщовый короткий Тёмный', 1, 'Зал 75'],
+        ['move', 'Profoto Zoom 2', 2, 'Зал 70'],
+        ['missing', 'Profoto Zoom 2', 1, '']
+    ]);
+    assert.deepEqual(plan.links.map(link => [link.from, link.to, link.kind]).sort(), [
+        ['Зал 70 (С)|600', 'Зал 75', 'move'],
+        ['Зал 75 (С)|900', 'Зал 75', 'keep']
+    ]);
+});
+
+test('planTomorrowTiles: нет анализа — пустой план', () => {
+    assert.deepEqual(m.planTomorrowTiles(null, null), { tiles: [], links: [] });
+});
+
+test('planTomorrowTiles: оборудование не к первой брони зала плашки не даёт (его разбирают на ночь)', () => {
+    /* 25.10, Павелецкая: фон Песочный нужен брони в 17:00, первая бронь Зал 100 — в 10:00 → плашки нет */
+    const records = m.recordsOfCategory(recordsFromFixture(fixture), 'P');
+    const tomorrow = m.parseDayList(m.buildDayList(records).text);
+    const plan = m.planTomorrowTiles(m.analyzeTomorrow([], tomorrow), records);
+
+    assert.deepEqual(plan, { tiles: [], links: [] });
+});
+
+test('calendarDayIso: «ДД.ММ» из календаря → дата с ближайшим годом; shiftDay', () => {
+    const now = new Date('2026-10-24T10:00:00Z');
+
+    assert.equal(m.calendarDayIso('27.10', now), '2026-10-27');
+    assert.equal(m.calendarDayIso('24.10', now), '2026-10-24');
+    assert.equal(m.calendarDayIso('', now), '2026-10-24');
+    assert.equal(m.calendarDayIso('31.02', now), '2026-10-24');
+    /* стык лет: в конце декабря «03.01» — это следующий год, в начале января «30.12» — прошлый */
+    assert.equal(m.calendarDayIso('03.01', new Date('2026-12-30T10:00:00Z')), '2027-01-03');
+    assert.equal(m.calendarDayIso('30.12', new Date('2027-01-02T10:00:00Z')), '2026-12-30');
+    assert.equal(m.shiftDay('2026-10-27', 1), '2026-10-28');
+    assert.equal(m.shiftDay('2026-12-31', 1), '2027-01-01');
+});
+
+test('bookingCopyLine: «1 шт. | Зонт - 165см Deep white» — количество впереди, без «Umbrella»', () => {
+    assert.equal(m.bookingCopyLine('Зонт - Umbrella 165см Deep white', 1), '1 шт. | Зонт - 165см Deep white');
+    assert.equal(m.bookingCopyLine('Profoto D1 500 Air', 1), '1 шт. | Profoto D1 500 Air');
+    assert.equal(m.bookingCopyLine('Avenger C-Stand A2033L', 2), '2 шт. | Avenger C-Stand A2033L');
+    assert.equal(m.bookingCopyLine('Текстиль Silk 12x12', 1.5), '1,5 шт. | Текстиль Silk 12x12');
+});
+
+test('цвета стадий по умолчанию (5.5.2) и перенос прежних исходных цветов Bitrix', () => {
+    const fresh = m.sanitizeFeatures({});
+
+    assert.deepEqual(
+        ['multi', 'done', 'prepaid', 'checked'].map(id => fresh.colors[id]),
+        ['#fff893', '#e0edd4', '#94e3fe', '#a3d49b']
+    );
+
+    /* сохранённый старый цвет по умолчанию (= исходный Bitrix) заменяется новым, свой цвет пользователя остаётся */
+    const migrated = m.sanitizeFeatures({ colors: { done: '#7bd500', prepaid: '#123456' } });
+
+    assert.equal(migrated.colors.done, '#e0edd4');
+    assert.equal(migrated.colors.prepaid, '#123456');
+});
+
+test('sanitizeFeatures: новый пользователь получает текущий набор, сохранённое не меняется; давнему недостающее включено', () => {
+    const fresh = m.sanitizeFeatures({});
+    /* 5.6.8: надписи и тёмные значки остаются opt-in, остальные функции включены, кроме полос. */
+    m.FEATURE_KEYS.forEach(key => assert.equal(
+        fresh[key],
+        key !== 'stripes' && !['badgeText', 'badgeDark'].includes(key),
+        key
+    ));
+
+    const saved = m.sanitizeFeatures({ borders: true, arrows: false });
+    assert.equal(saved.borders, true);
+    assert.equal(saved.arrows, false);
+
+    const legacy = m.sanitizeFeatures({ arrows: false }, true);
+    assert.equal(legacy.arrows, false);
+    assert.equal(legacy.borders, true);
+
+    assert.deepEqual(fresh.colors, {
+        multi: '#fff893', done: '#e0edd4', prepaid: '#94e3fe', checked: '#a3d49b',
+        kEq: '#e32400', kFrame: '#e32400', kBg: '#dc2626', handoff: '#800020', last: '#2563eb',
+        arrow: '#e11d48', moveArrow: '#2563eb', tile: '#7c3aed'
+    });
+
+    /* сохранённый красный 5.6.1 у прежнего пользователя остаётся */
+    assert.equal(m.sanitizeFeatures({ colors: { kEq: '#dc2626' } }, true).colors.kEq, '#dc2626');
+});
+
+test('5.6.1: прежние цвета обводки по умолчанию становятся красными, свой цвет остаётся; цвет плашек', () => {
+    const old = m.sanitizeFeatures({ colors: { kEq: '#2563eb', kFrame: '#f59e0b', kBg: '#123456' } }, true);
+    assert.deepEqual([old.colors.kEq, old.colors.kFrame, old.colors.kBg], ['#e32400', '#e32400', '#123456']);
+    assert.equal(m.sanitizeFeatures({}).colors.tile, '#7c3aed');
+    assert.equal(m.sanitizeFeatures({ colors: { tile: '#0EA5E9' } }).colors.tile, '#0ea5e9');
+});
+
+test('5.6.1: список дня в формате «1 шт. | название», звёздочка и «утром» читаются обратно', () => {
+    const records = [
+        { hall: 'Зал 50 (П)', start: 600, end: 720, items: ['Aputure Lantern 90 - 1 шт.', 'Amaran 300c - 1 шт.'] },
+        { hall: 'Зал 50 (П)', start: 780, end: 900, items: ['Amaran 300c - 2 шт.'] }
+    ];
+    const day = m.buildDayList(records);
+    assert.equal(day.text, 'Зал 50\n1 шт. | Aputure Lantern 90 *\n2 шт. | Amaran 300c (утром 1) *');
+
+    const halls = m.parseDayList(day.text);
+    assert.equal(halls[0].label, 'Зал 50');
+    assert.deepEqual(halls[0].items.map(i => [i.name, i.qty, i.needQty, i.star, i.known]),
+        [['Aputure Lantern 90', 1, 1, true, true], ['Amaran 300c', 2, 1, true, true]]);
+
+    const umbrella = m.parseDayList(m.buildDayList([{ hall: 'Зал 70 (П)', start: 600, end: 700, items: ['Зонт - Umbrella 165см Deep white - 1 шт.'] }]).text);
+    assert.deepEqual([umbrella[0].items[0].known, umbrella[0].items[0].key], [true, 'зонт - umbrella 165см deep white']);
+
+    const oldFormat = m.parseDayList('Зал 50\nAmaran 300c — 2 шт. *');
+    assert.deepEqual([oldFormat[0].items[0].qty, oldFormat[0].items[0].star], [2, true]);
+});
