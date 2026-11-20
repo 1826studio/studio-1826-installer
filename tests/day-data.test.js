@@ -38,6 +38,48 @@ test('dayBounds: [00:00 дня, 00:00 следующего дня) по Моск
     assert.deepEqual(m.dayBounds('2026-12-31'), { from: '2026-12-31T00:00:00+03:00', to: '2027-01-01T00:00:00+03:00' });
 });
 
+test('historyDays: строит включённый диапазон и ограничивает его 62 днями', () => {
+    assert.deepEqual(m.historyDays('2026-10-30', '2026-11-01'), [
+        '2026-10-30', '2026-10-31', '2026-11-01'
+    ]);
+    assert.equal(m.historyDays('2026-11-01', '2026-10-30'), null);
+    assert.equal(m.historyDays('2026-10-01', '2026-12-02'), null);
+    assert.equal(m.historyDays('не дата', '2026-11-01'), null);
+});
+
+test('Оборудование на 3 дня: даты, залы и количество выбранного филиала', () => {
+    const report = m.buildEquipmentMultiDayText([
+        { day: '2026-11-18', records: [
+            { hall: 'Зал 75 (П)', start: 600, end: 720, items: ['Зал 75 (П) - 1 шт.', 'Aputure Light Dome 150 - 1 шт.', 'Aputure Lantern 90 - 1 шт.', 'Aputure 700x - 2 шт.'] },
+            { hall: 'Зал 100 (П)', start: 780, end: 900, items: ['Зал 100 (П) - 1 шт.', 'Aputure Lantern 90 - 1 шт.'] },
+            { hall: 'Зал 70 (С)', start: 600, end: 720, items: ['Зал 70 (С) - 1 шт.', 'Aputure 700x - 9 шт.'] }
+        ] },
+        { day: '2026-11-19', records: [
+            { hall: 'Зал 100 (П)', start: 600, end: 720, items: ['Зал 100 (П) - 1 шт.', 'Aputure Lantern 90 - 1 шт.'] }
+        ] },
+        { day: '2026-11-20', records: [] }
+    ], 'P');
+
+    assert.equal(report.text, [
+        '18.11',
+        '',
+        'Зал 75',
+        '1 шт. | Aputure Light Dome 150',
+        '1 шт. | Aputure Lantern 90',
+        '2 шт. | Aputure 700x',
+        '',
+        'Зал 100',
+        '1 шт. | Aputure Lantern 90',
+        '',
+        '19.11',
+        '',
+        'Зал 100',
+        '1 шт. | Aputure Lantern 90'
+    ].join('\n'));
+    assert.deepEqual(report.sections.map(item => item.day), ['2026-11-18', '2026-11-19']);
+    assert.deepEqual(report.unknownHalls, []);
+});
+
 test('moscowParts: минуты и дата по Москве из строки CRM с любым поясом', () => {
     assert.deepEqual(m.moscowParts('2026-10-25T23:30:00+03:00'), { day: '2026-10-25', minutes: 1410 });
     assert.deepEqual(m.moscowParts('2026-10-25T20:30:00Z'), { day: '2026-10-25', minutes: 1410 });
@@ -118,6 +160,96 @@ test('итог по студии: между залами суммируется
     assert.equal(total.qty, 4);
     assert.equal(total.halls, 2);
     assert.equal(summary.halls.find(hall => hall.label === 'Зал 70').items[0].sources.length, 2);
+});
+
+test('история позиции: оба филиала, залы, даты, время и количество', () => {
+    const history = m.summarizeEquipmentHistory([
+        {
+            day: '2026-10-30',
+            records: [
+                { id: '101', hall: 'Зал 70 (С)', start: 600, end: 720, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 2 шт.'] },
+                { id: '102', hall: 'Зал 100 (П)', start: 780, end: 900, items: ['Зал 100 (П) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }
+            ]
+        },
+        {
+            day: '2026-10-31',
+            records: [
+                { id: '103', hall: 'Зал 70 (С)', start: 900, end: 960, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 3 шт.'] }
+            ]
+        }
+    ], 'Profoto Zoom 2');
+
+    assert.equal(history.name, 'Profoto Zoom 2');
+    assert.equal(history.totalBookings, 3);
+    assert.equal(history.totalDays, 2);
+    assert.deepEqual(history.branches.map(branch => branch.name), ['Павелецкая', 'Серпуховская']);
+    assert.deepEqual(history.branches[0].days[0].halls[0].occurrences.map(item => [item.day, item.qty, item.id]), [
+        ['2026-10-30', 1, '102']
+    ]);
+    assert.deepEqual(history.branches[1].days.map(day => day.day), ['2026-10-30', '2026-10-31']);
+    assert.deepEqual(history.branches[1].days[0].halls[0].occurrences.map(item => [item.day, item.qty, item.id]), [
+        ['2026-10-30', 2, '101']
+    ]);
+    assert.deepEqual(history.dailyTotals, [
+        { day: '2026-10-30', qty: 3 },
+        { day: '2026-10-31', qty: 3 }
+    ]);
+    assert.deepEqual(history.gaps, []);
+});
+
+test('история позиции: между датами добавляется пауза без использования', () => {
+    const history = m.summarizeEquipmentHistory([
+        { day: '2026-11-16', records: [{ hall: 'Зал 70 (С)', start: 600, end: 660, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }] },
+        { day: '2026-11-20', records: [{ hall: 'Зал 70 (С)', start: 600, end: 660, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }] }
+    ], 'Profoto Zoom 2');
+
+    assert.deepEqual(history.gaps, [{ from: '2026-11-17', to: '2026-11-19' }]);
+});
+
+test('история позиции: неизвестный товар и записи без филиала не попадают в результат', () => {
+    const records = [{ day: '2026-10-30', records: [
+        { id: '1', hall: 'Зал 70', start: 600, end: 660, items: ['Profoto Zoom 2 - 1 шт.'] },
+        { id: '2', hall: 'Зал 70 (С)', start: 600, end: 660, items: ['Aputure 600d Pro - 1 шт.'] }
+    ] }];
+
+    assert.equal(m.summarizeEquipmentHistory(records, 'Profoto Zoom 2').totalBookings, 0);
+    assert.deepEqual(m.summarizeEquipmentHistory(records, 'нет такой позиции').branches, []);
+});
+
+test('аудит движения: связывает освобождённый прибор со следующей бронью и отмечает вход без источника', () => {
+    const audit = m.analyzeEquipmentMovement([
+        { day: '2026-11-16', records: [
+            { id: '101', hall: 'Зал 70 (С)', start: 600, end: 660, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }
+        ] },
+        { day: '2026-11-16', records: [
+            { id: '102', hall: 'Зал 100 (П)', start: 720, end: 780, items: ['Зал 100 (П) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }
+        ] },
+        { day: '2026-11-17', records: [
+            { id: '103', hall: 'Зал 100 (П)', start: 600, end: 660, items: ['Зал 100 (П) - 1 шт.', 'Profoto Zoom 2 - 2 шт.'] }
+        ] }
+    ], 'Profoto Zoom 2', 2);
+
+    assert.equal(audit.transfers.length, 1);
+    assert.deepEqual([audit.transfers[0].from.branchName, audit.transfers[0].from.hall, audit.transfers[0].to.branchName, audit.transfers[0].to.hall, audit.transfers[0].qty], [
+        'Серпуховская', 'Зал 70', 'Павелецкая', 'Зал 100', 1
+    ]);
+    assert.equal(audit.stays.length, 1);
+    assert.equal(audit.untrackedQty, 1);
+    assert.equal(audit.totalBookedQty, 4);
+    assert.equal(audit.daily[0].peakConcurrent, 1);
+    assert.equal(audit.peakConcurrent, 2);
+});
+
+test('аудит движения: считает одновременную нехватку относительно ручного остатка', () => {
+    const audit = m.analyzeEquipmentMovement([
+        { day: '2026-11-18', records: [
+            { id: '201', hall: 'Зал 70 (С)', start: 600, end: 900, items: ['Зал 70 (С) - 1 шт.', 'Profoto Zoom 2 - 2 шт.'] },
+            { id: '202', hall: 'Зал 75 (П)', start: 720, end: 840, items: ['Зал 75 (П) - 1 шт.', 'Profoto Zoom 2 - 1 шт.'] }
+        ] }
+    ], 'Profoto Zoom 2', 2);
+
+    assert.equal(audit.peakConcurrent, 3);
+    assert.deepEqual(audit.shortageDays.map(item => [item.day, item.shortage]), [['2026-11-18', 1]]);
 });
 
 test('одна бронь не считается дважды, повторы внутри брони суммируются', () => {
@@ -232,9 +364,14 @@ test('цвета стадий по умолчанию (5.5.2) и перенос 
     assert.equal(migrated.colors.prepaid, '#123456');
 });
 
-test('sanitizeFeatures 5.6.3: новый пользователь — набор Ильи (всё, кроме полос); сохранённое не меняется; давнему недостающее включено', () => {
+test('sanitizeFeatures: новый пользователь получает текущий набор, сохранённое не меняется; давнему недостающее включено', () => {
     const fresh = m.sanitizeFeatures({});
-    m.FEATURE_KEYS.forEach(key => assert.equal(fresh[key], key !== 'stripes', key));
+    /* 5.6.8: надписи и тёмные значки остаются opt-in, остальные функции включены, кроме полос. */
+    m.FEATURE_KEYS.forEach(key => assert.equal(
+        fresh[key],
+        key !== 'stripes' && !['badgeText', 'badgeDark'].includes(key),
+        key
+    ));
 
     const saved = m.sanitizeFeatures({ borders: true, arrows: false });
     assert.equal(saved.borders, true);
