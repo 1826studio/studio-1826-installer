@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         v5.11.2 Studio 1826 — Расчёт администраторов и интерфейс
+// @name         v5.12.0 Studio 1826 — Расчёт администраторов и интерфейс
 // @namespace    studio1826
-// @version      5.11.2
+// @version      5.12.0
 // @description  Расчёт администраторов, копирование оборудования, информация по помещениям, тема и скрытие элементов Bitrix24 (в настройках)
 // @updateURL    https://raw.githubusercontent.com/zinovievilia/studio-1826-installer/main/studio1826.meta.js
 // @downloadURL  https://raw.githubusercontent.com/zinovievilia/studio-1826-installer/main/studio1826.user.js
@@ -14,7 +14,7 @@
 (function () {
     'use strict';
 
-    const VERSION = '5.11.2';
+    const VERSION = '5.12.0';
 
     const WIDGET_ID = 'studio1826-widget-v3';
     const STYLE_ID = 'studio1826-style-v3';
@@ -3662,6 +3662,47 @@
     }
 
     /*
+     * Компактный список оборудования на несколько дней для копирования в чат.
+     * Каждый день берётся отдельно, поэтому внутри зала сохраняется правило
+     * buildDayList: между бронями позиции не суммируются, берётся максимум.
+     */
+    function buildEquipmentMultiDayText(entries, category) {
+        const branch = category === 'P' ? 'P' : 'C';
+        const sections = [];
+        const unknownHalls = [];
+
+        (entries || []).forEach(entry => {
+            const day = String(entry && entry.day || '');
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !entry || !Array.isArray(entry.records)) return;
+
+            const result = buildDayList(recordsOfCategory(entry.records, branch));
+            if (!result.text) return;
+
+            /* Для трёхдневной сводки звёздочки «к первой брони» не нужны —
+             * это список для подготовки, а не подробный список дня. */
+            const plainText = result.blocks
+                .map(block => [
+                    block.label,
+                    ...block.items.map(item => bookingCopyLine(item.name, item.qty))
+                ].join('\n'))
+                .join('\n\n');
+
+            sections.push({
+                day,
+                text: `${day.slice(8, 10)}.${day.slice(5, 7)}\n\n${plainText}`
+            });
+
+            result.unknownHalls.forEach(hall => unknownHalls.push(`${day.slice(8, 10)}.${day.slice(5, 7)} — ${hall}`));
+        });
+
+        return {
+            text: sections.map(section => section.text).join('\n\n'),
+            sections,
+            unknownHalls
+        };
+    }
+
+    /*
      * История выбранной позиции. entries: [{ day: 'YYYY-MM-DD', records: [...] }].
      * В результат попадает каждая бронь с количеством позиции, а также календарные
      * дни без использования между первой и последней найденной датой.
@@ -7291,6 +7332,12 @@
 
             bar.appendChild(el('button', {
                 type: 'button',
+                className: 'da-btn da-copy-3',
+                title: 'Скопировать оборудование на три следующих дня по выбранному филиалу'
+            }, ['Оборудование на 3 дня']));
+
+            bar.appendChild(el('button', {
+                type: 'button',
                 className: 'da-btn da-plan',
                 title: 'Посчитать, что не нужно разбирать на завтра'
             }, ['Не разбирать на завтра…']));
@@ -7577,7 +7624,7 @@
 
                 if (!days || !Number.isInteger(totalUnits) || totalUnits < 1 || totalUnits > 100) {
                     historyStatus.classList.add('dh-warn');
-                    historyStatus.textContent = 'Укажите корректный период до 31 дня и целое количество приборов от 1 до 100.';
+                    historyStatus.textContent = 'Укажите корректный период до 62 дней и целое количество приборов от 1 до 100.';
                     return;
                 }
 
@@ -7768,6 +7815,51 @@
                 }
 
                 showCopyToast(day.text, ok, notes.join('\n'));
+            });
+
+            /* Кнопка 1.1: компактный список оборудования на три следующих дня. */
+            const copyThreeButton = bar.querySelector('.da-copy-3');
+
+            copyThreeButton.addEventListener('click', async () => {
+                const days = [1, 2, 3].map(offset => shiftDay(baseDayIso(), offset));
+                const entries = [];
+                const failed = [];
+                const originalText = copyThreeButton.textContent;
+
+                copyThreeButton.disabled = true;
+                copyThreeButton.textContent = 'Загружаю…';
+
+                try {
+                    for (const day of days) {
+                        const entry = await loadDay(day);
+
+                        if (entry && Array.isArray(entry.records)) {
+                            entries.push({ day, records: entry.records });
+                            if (entry.error) failed.push(`${day.slice(8, 10)}.${day.slice(5, 7)}: ${entry.error}`);
+                        } else {
+                            failed.push(`${day.slice(8, 10)}.${day.slice(5, 7)}: ${(entry && entry.error) || 'нет данных'}`);
+                        }
+                    }
+
+                    const report = buildEquipmentMultiDayText(entries, category);
+
+                    if (!report.text) {
+                        showCopyToast('', false, 'На три следующих дня оборудование в выбранном филиале не найдено.');
+                        return;
+                    }
+
+                    const notes = [];
+                    if (failed.length) notes.push(`Не загружены дни: ${failed.join(', ')}`);
+                    if (report.unknownHalls.length) {
+                        notes.push(`Время начала не определено: ${report.unknownHalls.join(', ')}. Звёздочки не поставлены.`);
+                    }
+
+                    const ok = await copyText(report.text);
+                    showCopyToast(report.text, ok, notes.join('\n'));
+                } finally {
+                    copyThreeButton.disabled = false;
+                    copyThreeButton.textContent = originalText;
+                }
             });
 
             /*
@@ -9691,7 +9783,7 @@
             findHallName, formatClock,
             buildDayList, parseDayList, analyzeTomorrow, computePayout,
             validateCollectorPayload, encodeRequest, decodeRequest, shortEquipmentName, bookingCopyLine,
-            moscowDay, dayBounds, moscowParts, shiftDay, calendarDayIso, dealToRecord, recordsOfCategory, recordEquipment, summarizeEquipment, historyDays, summarizeEquipmentHistory, analyzeEquipmentMovement, findDuplicateRows, planTomorrowTiles,
+            moscowDay, dayBounds, moscowParts, shiftDay, calendarDayIso, dealToRecord, recordsOfCategory, recordEquipment, summarizeEquipment, historyDays, buildEquipmentMultiDayText, summarizeEquipmentHistory, analyzeEquipmentMovement, findDuplicateRows, planTomorrowTiles,
             sanitizeFeatures, exportSettings, parseSettingsImport, FEATURE_KEYS, COLOR_ITEMS,
             money, formatAmount,
             EQUIPMENT, SERVICES, HOURS_BONUSES,
