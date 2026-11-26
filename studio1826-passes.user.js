@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         v1.8.0 Studio 1826 — Пропуска списком (Авангард)
+// @name         v1.8.1 Studio 1826 — Пропуска списком (Авангард)
 // @namespace    studio1826
-// @version      1.8.0
+// @version      1.8.1
 // @description  Кнопка «Оформить пропуск» в окне ввода открытых линий Bitrix24: список ФИО + дата → пропуска в Авангарде оформляются по очереди с проверкой; в Авангарде — кнопка «Пропуска списком» и часы машин за сегодня
 // @updateURL    https://raw.githubusercontent.com/zinovievilia/studio-1826-installer/main/studio1826-passes.user.js
 // @downloadURL  https://raw.githubusercontent.com/zinovievilia/studio-1826-installer/main/studio1826-passes.user.js
@@ -27,7 +27,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.8.0';
+  const VERSION = '1.8.1';
   const DEFAULT_GUESTS_URL = 'https://my.avanguard.pro/account/354/guests';
 
   // ── Чистые функции (тесты: tests/passes.test.js) ───────────────────────────
@@ -1402,8 +1402,8 @@
   ];
 
   // С адресом — для Павелецкой (ссылку на Серпуховскую Илья пока не дал). Добавляется к любому варианту выше.
-  const DONE_LINK = 'https://1826.studio/pav/contacts';
-  const DONE_LINK_INTROS = ['Информация как нас найти:']; // формулировка Ильи, своих не добавлять
+  //const DONE_LINK = 'https://1826.studio/pav/contacts';
+  //const DONE_LINK_INTROS = ['Информация как нас найти:']; // формулировка Ильи, своих не добавлять
 
   // ── Bitrix24: кнопка «Пропуск» ──────────────────────────────────────────────
 
@@ -1490,7 +1490,7 @@
     let box = row;
     while (box && !box.querySelector('textarea')) box = box.parentElement;
     const area = box && box.querySelector('textarea');
-    const text = pickDoneMessage(donePool(lastRunCount > 1 ? DONE_MANY : DONE_ONE, new Date().getHours()), lastDone, DONE_LINK, DONE_LINK_INTROS);
+    const text = pickDoneMessage(donePool(lastRunCount > 1 ? DONE_MANY : DONE_ONE, new Date().getHours()), lastDone);
     const prevDone = lastDone;
     lastDone = text;
     if (!area) {
